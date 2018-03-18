@@ -20,10 +20,6 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
-
-
-
-
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -205,10 +201,14 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-  intr_set_level (old_level);
+  // intr_set_level (old_level);
 
   /* Add to run queue. */
   thread_unblock (t);
+
+  // old_level = intr_disable ();
+  priority_yield();
+  intr_set_level (old_level);
 
   return tid;
 }
@@ -330,11 +330,23 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
+    // put thread in ready_list in priority order
     // list_push_back (&ready_list, &cur->elem);
     list_insert_ordered (&ready_list, &cur->elem, priority_bigger, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
+}
+
+/* Yield the current thread if its priority is lower than the first in the ready list */
+void
+priority_yield (void) 
+{
+  if (list_empty (&ready_list))
+    return;
+  struct thread *t =  list_entry (list_front (&ready_list), struct thread, elem);
+  if ((t->priority) > (thread_current()->priority))
+    thread_yield();
 }
 
 bool is_idle_thread(struct thread *t) {
@@ -362,7 +374,12 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  enum intr_level old_level;
+
+  old_level = intr_disable ();
   thread_current ()->priority = new_priority;
+  priority_yield();
+  intr_set_level (old_level);
 }
 
 /* Returns the current thread's priority. */
@@ -585,7 +602,6 @@ schedule (void)
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
-  // printf("*******************");
 }
 
 /* Returns a tid to use for a new thread. */
