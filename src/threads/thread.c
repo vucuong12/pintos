@@ -20,9 +20,9 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
-/* List of processes in THREAD_READY state, that is, processes
-   that are ready to run but not actually running. */
-static struct list ready_list;
+
+
+
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -91,6 +91,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
+  list_init (&waiting_list);
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -246,8 +247,15 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
+
   t->status = THREAD_READY;
   intr_set_level (old_level);
+}
+
+void
+thread_reschedule()
+{
+  schedule();
 }
 
 /* Returns the name of the running thread. */

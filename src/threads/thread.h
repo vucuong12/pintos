@@ -102,6 +102,21 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
   };
 
+/* A linked list element. */
+struct waiting_thread 
+  {
+    struct list_elem elem;      /* List element. */
+    int64_t waketime;                  /* Item value. */
+    struct list_elem *thread_elem;
+  };
+/* List of processes in THREAD_BLOCKED state, that is, processes
+   that are waiting for some event such as timer, networking, etc. */
+struct list waiting_list;
+
+/* List of processes in THREAD_READY state, that is, processes
+   that are ready to run but not actually running. */
+struct list ready_list;
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -125,6 +140,7 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+void thread_reschedule (void);
 
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);

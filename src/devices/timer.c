@@ -84,16 +84,47 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-/* Sleeps for approximately TICKS timer ticks.  Interrupts must
-   be turned on. */
+
+
+/* Returns true if thread A is waken before B, false
+   otherwise. */
+static bool
+waken_time_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED) 
+{
+  const struct waiting_thread *a = list_entry (a_, struct waiting_thread, elem);
+  const struct waiting_thread *b = list_entry (b_, struct waiting_thread, elem);
+  struct thread *t1 = list_entry(a->thread_elem, struct thread, elem);
+  struct thread *t2 = list_entry(b->thread_elem, struct thread, elem);
+  return a->waketime < b->waketime || (a->waketime == b->waketime && t1->priority > t2->priority);
+}
+
+/* Sleeps for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) 
 {
+  enum intr_level old_level;
   int64_t start = timer_ticks ();
+  old_level = intr_disable ();
+  struct waiting_thread to_sleep_thread;
+  to_sleep_thread.thread_elem = &(thread_current ()->elem);
+  //printf("Set name to %s ddd\n", thread_current ()->name);
+  to_sleep_thread.waketime = start + ticks;
+  // printf(">>>>>>> Wake time%d\n", to_sleep_thread.waketime);
+  list_insert_ordered (&waiting_list, &to_sleep_thread.elem, waken_time_less, NULL);
+  //printf("List size %d\n", list_size(&waiting_list));
 
-  ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  // struct list_elem *e;
+  // for (e = list_begin (&waiting_list); e != list_end (&waiting_list);
+  //      e = list_next (e))
+  //   {
+  //     struct waiting_thread *wait_thread = list_entry (e, struct waiting_thread, elem);
+  //     struct thread *t = list_entry(wait_thread->thread_elem, struct thread, elem);
+  //     printf("Get one thread named %s\n", t->name);
+
+  //   }
+  thread_block ();
+  intr_set_level (old_level);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -171,7 +202,49 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+
+  enum intr_level old_level;
+
+  // 0: turn off interrupt.
+  old_level = intr_disable ();
+
+  // printf("Size of waiting list (before) %d\n", list_size(&waiting_list));
+  // 1. For each such thread: delete trong waiting list and unblock using 
+
+  struct list_elem *e;
+  
+  for (e = list_begin (&waiting_list); e != list_end (&waiting_list);
+       e = list_next (e))
+    {
+      struct waiting_thread *wait_thread = list_entry (e, struct waiting_thread, elem);
+      if (ticks >= wait_thread->waketime) {
+        list_remove(&wait_thread->elem);
+        struct thread *t = list_entry((wait_thread->thread_elem), struct thread, elem);
+        printf("=>>>>>>> %d\n", t->priority);
+        ASSERT (t->status == THREAD_BLOCKED);
+        list_push_back (&ready_list, &t->elem);
+        t->status = THREAD_READY;
+        break;
+      } else {
+        break;
+      }
+      
+    }
+
+    // printf("Size of waiting list (after)");
+    // printf("Size of ready list %d\n",list_entry(list_begin (&ready_list), struct thread, elem));
+    // for (e = list_begin (&ready_list); e != list_end (&ready_list);
+    //    e = list_next (e))
+    // {
+    //   struct thread *t = list_entry(e, struct thread, elem);
+    //   printf("Read ready_list %d\n", t->priority);
+    // }
+    // printf("Done reading ready_list\n");
+  // 2. Turn on
+  
+  // thread_reschedule();
   thread_tick ();
+  intr_set_level (old_level);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
