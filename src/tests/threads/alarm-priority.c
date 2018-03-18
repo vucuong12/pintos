@@ -46,6 +46,8 @@ alarm_priority_thread (void *aux UNUSED)
   while (timer_elapsed (start_time) == 0)
     continue;
 
+  //msg ("Put thread to sleep with priority %d\n", thread_current()->priority);
+
   /* Now we know we're at the very beginning of a timer tick, so
      we can call timer_sleep() without worrying about races
      between checking the time and a timer interrupt. */

@@ -110,7 +110,7 @@ timer_sleep (int64_t ticks)
   to_sleep_thread.thread_elem = &(thread_current ()->elem);
   //printf("Set name to %s ddd\n", thread_current ()->name);
   to_sleep_thread.waketime = start + ticks;
-  // printf(">>>>>>> Wake time%d\n", to_sleep_thread.waketime);
+  //printf(">>>>>>> Wake time%d\n", to_sleep_thread.waketime);
   list_insert_ordered (&waiting_list, &to_sleep_thread.elem, waken_time_less, NULL);
   //printf("List size %d\n", list_size(&waiting_list));
 
@@ -220,29 +220,15 @@ timer_interrupt (struct intr_frame *args UNUSED)
       if (ticks >= wait_thread->waketime) {
         list_remove(&wait_thread->elem);
         struct thread *t = list_entry((wait_thread->thread_elem), struct thread, elem);
-        printf("=>>>>>>> %d\n", t->priority);
+        //printf("=>>>>>>>Current thread priority %d\n", (thread_current())->priority);
         ASSERT (t->status == THREAD_BLOCKED);
         list_push_back (&ready_list, &t->elem);
         t->status = THREAD_READY;
-        break;
       } else {
         break;
-      }
-      
+      }     
     }
-
-    // printf("Size of waiting list (after)");
-    // printf("Size of ready list %d\n",list_entry(list_begin (&ready_list), struct thread, elem));
-    // for (e = list_begin (&ready_list); e != list_end (&ready_list);
-    //    e = list_next (e))
-    // {
-    //   struct thread *t = list_entry(e, struct thread, elem);
-    //   printf("Read ready_list %d\n", t->priority);
-    // }
-    // printf("Done reading ready_list\n");
-  // 2. Turn on
-  
-  // thread_reschedule();
+  intr_yield_on_return();
   thread_tick ();
   intr_set_level (old_level);
 }

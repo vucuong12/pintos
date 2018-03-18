@@ -252,12 +252,6 @@ thread_unblock (struct thread *t)
   intr_set_level (old_level);
 }
 
-void
-thread_reschedule()
-{
-  schedule();
-}
-
 /* Returns the name of the running thread. */
 const char *
 thread_name (void) 
@@ -312,6 +306,18 @@ thread_exit (void)
   NOT_REACHED ();
 }
 
+/* Returns true if thread A has higher priority than B, false
+   otherwise. */
+static bool
+priority_bigger (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED) 
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  
+  return a->priority > b->priority ;
+}
+
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void
@@ -324,10 +330,15 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    // list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered (&ready_list, &cur->elem, priority_bigger, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
+}
+
+bool is_idle_thread(struct thread *t) {
+  return (t == idle_thread) ;
 }
 
 /* Invoke function 'func' on all threads, passing along 'aux'.
@@ -574,6 +585,7 @@ schedule (void)
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
+  // printf("*******************");
 }
 
 /* Returns a tid to use for a new thread. */
