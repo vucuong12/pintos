@@ -206,10 +206,10 @@ timer_interrupt (struct intr_frame *args UNUSED)
         break;
       list_remove(&wait_thread->elem);
       struct thread *t = list_entry((wait_thread->thread_elem), struct thread, elem);
-      //thread_unblock(t);
-      ASSERT (t->status == THREAD_BLOCKED); 
-      list_push_back (&ready_list, &t->elem);  
-      t->status = THREAD_READY;   
+      thread_unblock(t);
+      // ASSERT (t->status == THREAD_BLOCKED); 
+      // list_push_back (&ready_list, &t->elem);  
+      // t->status = THREAD_READY;   
     }
   thread_tick ();
   intr_set_level (old_level);

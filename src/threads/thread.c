@@ -246,7 +246,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+
+  list_insert_ordered (&ready_list, &t->elem, priority_higher, NULL);
 
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -308,8 +309,7 @@ thread_exit (void)
 
 /* Returns true if thread A has higher priority than B, false
    otherwise. */
-static bool
-priority_bigger (const struct list_elem *a_, const struct list_elem *b_,
+bool priority_higher (const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED) 
 {
   const struct thread *a = list_entry (a_, struct thread, elem);
@@ -332,7 +332,7 @@ thread_yield (void)
   if (cur != idle_thread) 
     // put thread in ready_list in priority order
     // list_push_back (&ready_list, &cur->elem);
-    list_insert_ordered (&ready_list, &cur->elem, priority_bigger, NULL);
+    list_insert_ordered (&ready_list, &cur->elem, priority_higher, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
