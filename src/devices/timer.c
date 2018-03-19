@@ -228,7 +228,6 @@ timer_interrupt (struct intr_frame *args UNUSED)
         break;
       }     
     }
-  intr_yield_on_return();
   thread_tick ();
   intr_set_level (old_level);
 }
