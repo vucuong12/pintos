@@ -196,8 +196,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
   // 0: turn off interrupt.
   old_level = intr_disable ();
 
-  // 1. For each such thread: delete trong waiting list and unblock using 
-
+  // 1. For each waiting thread: remove it from waiting list and push it to ready_list.
   struct list_elem *e;
   
   for (e = list_begin (&waiting_list); e != list_end (&waiting_list); e = list_next (e))
@@ -207,7 +206,10 @@ timer_interrupt (struct intr_frame *args UNUSED)
         break;
       list_remove(&wait_thread->elem);
       struct thread *t = list_entry((wait_thread->thread_elem), struct thread, elem);
-      thread_unblock(t);    
+      //thread_unblock(t);
+      ASSERT (t->status == THREAD_BLOCKED); 
+      list_push_back (&ready_list, &t->elem);  
+      t->status = THREAD_READY;   
     }
   thread_tick ();
   intr_set_level (old_level);
