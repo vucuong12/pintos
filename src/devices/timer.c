@@ -84,8 +84,6 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-
-
 /* Returns true if thread A is waken before B, false
    otherwise. */
 static bool
@@ -113,16 +111,6 @@ timer_sleep (int64_t ticks)
   //printf(">>>>>>> Wake time%d\n", to_sleep_thread.waketime);
   list_insert_ordered (&waiting_list, &to_sleep_thread.elem, waken_time_less, NULL);
   //printf("List size %d\n", list_size(&waiting_list));
-
-  // struct list_elem *e;
-  // for (e = list_begin (&waiting_list); e != list_end (&waiting_list);
-  //      e = list_next (e))
-  //   {
-  //     struct waiting_thread *wait_thread = list_entry (e, struct waiting_thread, elem);
-  //     struct thread *t = list_entry(wait_thread->thread_elem, struct thread, elem);
-  //     printf("Get one thread named %s\n", t->name);
-
-  //   }
   thread_block ();
   intr_set_level (old_level);
 }
@@ -208,25 +196,18 @@ timer_interrupt (struct intr_frame *args UNUSED)
   // 0: turn off interrupt.
   old_level = intr_disable ();
 
-  // printf("Size of waiting list (before) %d\n", list_size(&waiting_list));
   // 1. For each such thread: delete trong waiting list and unblock using 
 
   struct list_elem *e;
   
-  for (e = list_begin (&waiting_list); e != list_end (&waiting_list);
-       e = list_next (e))
+  for (e = list_begin (&waiting_list); e != list_end (&waiting_list); e = list_next (e))
     {
       struct waiting_thread *wait_thread = list_entry (e, struct waiting_thread, elem);
-      if (ticks >= wait_thread->waketime) {
-        list_remove(&wait_thread->elem);
-        struct thread *t = list_entry((wait_thread->thread_elem), struct thread, elem);
-        //printf("=>>>>>>>Current thread priority %d\n", (thread_current())->priority);
-        ASSERT (t->status == THREAD_BLOCKED);
-        list_push_back (&ready_list, &t->elem);
-        t->status = THREAD_READY;
-      } else {
+      if (ticks < wait_thread->waketime)
         break;
-      }     
+      list_remove(&wait_thread->elem);
+      struct thread *t = list_entry((wait_thread->thread_elem), struct thread, elem);
+      thread_unblock(t);    
     }
   thread_tick ();
   intr_set_level (old_level);
