@@ -69,7 +69,6 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-
       list_insert_ordered (&sema->waiters, &thread_current ()->elem, priority_higher, NULL);
       thread_block ();
     }
@@ -192,16 +191,16 @@ update_ready_list_when_thread_priority_changes(struct thread *t)
 }
 
 // a donate its priority to b if b != null and priority(b) < priority(a)
-static void 
-donate(struct thread *a, struct thread *b)
-{
-  if (b != NULL && b->priority < a->priority){
-    if (b->original_priority == -1)
-      b->original_priority = b->priority;
-    b->priority = a->priority;
-    update_ready_list_when_thread_priority_changes(b);
-  }
-}
+// static void 
+// donate(struct thread *a, struct thread *b)
+// {
+//   if (b != NULL && b->priority < a->priority){
+//     if (b->original_priority == -1)
+//       b->original_priority = b->priority;
+//     b->priority = a->priority;
+//     update_ready_list_when_thread_priority_changes(b);
+//   }
+// }
 
 static int 
 max_waiter_priority(struct lock *l)
@@ -239,7 +238,8 @@ lock_priority_lower (const struct list_elem *a_, const struct list_elem *b_,
 static void 
 add_lock_to_thread(struct thread *t, struct lock *l) 
 {
-  struct lock_address_elem *lock_elem = malloc (sizeof *lock_elem);
+  // struct lock_address_elem *lock_elem = malloc (sizeof *lock_elem);
+  struct lock_address_elem *lock_elem;
   lock_elem->address = l;
   //list_insert_ordered(&t->locks, &t->elem, lock_priority_higher, NULL);
   list_push_back(&t->locks, &lock_elem->elem);
@@ -260,10 +260,16 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
-  donate(thread_current(), lock->holder);
+  // donate(thread_current(), lock->holder);
+  if (lock->holder != NULL && lock->holder->priority < thread_current()->priority){
+    if (lock->holder->original_priority == -1)
+      lock->holder->original_priority = lock->holder->priority;
+    lock->holder->priority = thread_current()->priority;
+    // update_ready_list_when_thread_priority_changes(b);
+  }
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
-  add_lock_to_thread(lock->holder, lock);
+  // add_lock_to_thread(lock->holder, lock);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -287,27 +293,29 @@ lock_try_acquire (struct lock *lock)
 }
 
 static void
-update_thread_priority(void)
+update_thread_priority()
 {
-  struct thread *t = thread_current();
-  ASSERT (t->original_priority != -1);
-  int new_priority;
-  if (list_empty(&t->locks)){
-    new_priority = t->original_priority;
-    t->original_priority = -1;
-    
-  }
-  else {
-    struct lock_address_elem *max_lock = list_entry(list_max(&t->locks, lock_priority_lower, NULL), struct lock_address_elem, elem);
-    int max_priority_for_a_lock = max_waiter_priority(max_lock->address);
-    if (max_priority_for_a_lock > t->original_priority){
-      new_priority = max_priority_for_a_lock;
-    } else {
+  struct thread * t = thread_current();
+  // ASSERT (t->original_priority != -1);
+  if (t->original_priority == -1){
+    int new_priority;
+    if (list_empty(&t->locks)){
       new_priority = t->original_priority;
       t->original_priority = -1;
+      
     }
+    else {
+      struct lock_address_elem *max_lock = list_entry(list_max(&t->locks, lock_priority_lower, NULL), struct lock_address_elem, elem);
+      int max_priority_for_a_lock = max_waiter_priority(max_lock->address);
+      if (max_priority_for_a_lock > t->original_priority){
+        new_priority = max_priority_for_a_lock;
+      } else {
+        new_priority = t->original_priority;
+        t->original_priority = -1;
+      }
+    }
+    thread_set_priority(new_priority);
   }
-  thread_set_priority(new_priority);
 }
 
 static void
@@ -321,7 +329,7 @@ update_thread_priority_after_lock_release(struct lock *l)
     struct lock_address_elem *lae = list_entry (e, struct lock_address_elem, elem);
     if (l == lae->address) {
       list_remove(e);
-      free(lae);
+      // free(lae);
       break;
     }
   }
@@ -339,9 +347,13 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  if (thread_current()->original_priority != -1){
+    thread_current()->priority = thread_current()->original_priority;
+    thread_current()->original_priority = -1;
+  }
   lock->holder = NULL;
   sema_up (&lock->semaphore);
-  update_thread_priority_after_lock_release(lock);
+  // update_thread_priority_after_lock_release(lock);
 }
 
 /* Returns true if the current thread holds LOCK, false
