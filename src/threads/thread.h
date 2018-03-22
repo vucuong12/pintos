@@ -95,6 +95,8 @@ struct thread
 
     // New fields
     int64_t waketime; 
+    int original_priority;
+    struct list locks;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -109,6 +111,10 @@ struct thread
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+
+/* List of processes in THREAD_READY state, that is, processes
+   that are ready to run but not actually running. */
+struct list ready_list;
 
 void thread_init (void);
 void thread_start (void);

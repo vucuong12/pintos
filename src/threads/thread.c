@@ -20,10 +20,6 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
-/* List of processes in THREAD_READY state, that is, processes
-   that are ready to run but not actually running. */
-static struct list ready_list;
-
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -313,7 +309,7 @@ thread_exit (void)
 /* Returns true if thread A has higher priority than B, false
    otherwise. */
 bool priority_higher (const struct list_elem *a_, const struct list_elem *b_,
-                      void *aux) 
+                      void *aux UNUSED) 
 {
   const struct thread *a = list_entry (a_, struct thread, elem);
   const struct thread *b = list_entry (b_, struct thread, elem);
@@ -508,6 +504,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  t->original_priority = -1; // not donated
+  list_init(&t->locks);
   list_push_back (&all_list, &t->allelem);
 }
 
