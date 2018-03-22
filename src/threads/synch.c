@@ -191,16 +191,16 @@ update_ready_list_when_thread_priority_changes(struct thread *t)
 }
 
 // a donate its priority to b if b != null and priority(b) < priority(a)
-// static void 
-// donate(struct thread *a, struct thread *b)
-// {
-//   if (b != NULL && b->priority < a->priority){
-//     if (b->original_priority == -1)
-//       b->original_priority = b->priority;
-//     b->priority = a->priority;
-//     update_ready_list_when_thread_priority_changes(b);
-//   }
-// }
+static void 
+donate(struct thread *a, struct thread *b)
+{
+  if (b != NULL && b->priority < a->priority){
+    if (b->original_priority == -1)
+      b->original_priority = b->priority;
+    b->priority = a->priority;
+    update_ready_list_when_thread_priority_changes(b);
+  }
+}
 
 static int 
 max_waiter_priority(struct lock *l)
@@ -260,13 +260,7 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
-  // donate(thread_current(), lock->holder);
-  if (lock->holder != NULL && lock->holder->priority < thread_current()->priority){
-    if (lock->holder->original_priority == -1)
-      lock->holder->original_priority = lock->holder->priority;
-    lock->holder->priority = thread_current()->priority;
-    // update_ready_list_when_thread_priority_changes(b);
-  }
+  donate(thread_current(), lock->holder);
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
   // add_lock_to_thread(lock->holder, lock);
