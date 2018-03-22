@@ -17,6 +17,10 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
+/* List of processes in THREAD_BLOCKED state, that is, processes
+   that are waiting for some event such as timer, networking, etc. */
+static struct list sleep_list;
+
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
@@ -35,6 +39,7 @@ static void real_time_delay (int64_t num, int32_t denom);
 void
 timer_init (void) 
 {
+  list_init (&sleep_list);
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
@@ -90,27 +95,21 @@ static bool
 waken_time_less (const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED) 
 {
-  const struct waiting_thread *a = list_entry (a_, struct waiting_thread, elem);
-  const struct waiting_thread *b = list_entry (b_, struct waiting_thread, elem);
-  struct thread *t1 = list_entry(a->thread_elem, struct thread, elem);
-  struct thread *t2 = list_entry(b->thread_elem, struct thread, elem);
-  return a->waketime < b->waketime || (a->waketime == b->waketime && t1->priority > t2->priority);
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  return a->waketime < b->waketime || (a->waketime == b->waketime && a->priority > a->priority);
 }
 
 /* Sleeps for approximately TICKS timer ticks. */
 void
-timer_sleep (int64_t ticks) 
+timer_sleep (int64_t ticks)
 {
   enum intr_level old_level;
   int64_t start = timer_ticks ();
   old_level = intr_disable ();
-  struct waiting_thread to_sleep_thread;
-  to_sleep_thread.thread_elem = &(thread_current ()->elem);
-  //printf("Set name to %s ddd\n", thread_current ()->name);
-  to_sleep_thread.waketime = start + ticks;
-  //printf(">>>>>>> Wake time%d\n", to_sleep_thread.waketime);
-  list_insert_ordered (&waiting_list, &to_sleep_thread.elem, waken_time_less, NULL);
-  //printf("List size %d\n", list_size(&waiting_list));
+  thread_current ()->waketime = start + ticks;
+  // printf("Wake time %d\n", thread_current ()->waketime);
+  list_insert_ordered (&sleep_list, &thread_current ()->elem, waken_time_less, NULL);
   thread_block ();
   intr_set_level (old_level);
 }
@@ -190,27 +189,20 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-
   enum intr_level old_level;
-
-  // 0: turn off interrupt.
   old_level = intr_disable ();
+  struct list_elem *e ;
+  while (!list_empty(&sleep_list)) {
+    e = list_begin (&sleep_list);
+    struct thread *sleep_thread = list_entry (e, struct thread, elem);
+    if (ticks < sleep_thread->waketime)
+      break;
+    // printf("Sleep thread %s\n", sleep_thread->name);
+    // printf("Waketime %d. Ticks: %d \n", sleep_thread->waketime, ticks);
+    list_remove(e);
+    thread_unblock(sleep_thread);  
+  }
 
-  // 1. For each waiting thread: remove it from waiting list and push it to ready_list.
-  struct list_elem *e;
-  
-  for (e = list_begin (&waiting_list); e != list_end (&waiting_list); e = list_next (e))
-    {
-      struct waiting_thread *wait_thread = list_entry (e, struct waiting_thread, elem);
-      if (ticks < wait_thread->waketime)
-        break;
-      list_remove(&wait_thread->elem);
-      struct thread *t = list_entry((wait_thread->thread_elem), struct thread, elem);
-      thread_unblock(t);
-      // ASSERT (t->status == THREAD_BLOCKED); 
-      // list_push_back (&ready_list, &t->elem);  
-      // t->status = THREAD_READY;   
-    }
   thread_tick ();
   intr_set_level (old_level);
 }
