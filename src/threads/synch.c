@@ -262,8 +262,8 @@ lock_acquire (struct lock *lock)
 
   donate(thread_current(), lock->holder);
   sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
-  // add_lock_to_thread(lock->holder, lock);
+  lock->holder = thread_current();
+  // add_lock_to_thread(thread_current(), lock);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
