@@ -12,7 +12,6 @@
 static thread_func alarm_priority_thread;
 static int64_t wake_time;
 static struct semaphore wait_sema;
-
 void
 test_alarm_priority (void) 
 {
@@ -34,8 +33,9 @@ test_alarm_priority (void)
 
   thread_set_priority (PRI_MIN);
 
-  for (i = 0; i < 10; i++)
+  for (i = 0; i < 10; i++){
     sema_down (&wait_sema);
+  }
 }
 
 static void

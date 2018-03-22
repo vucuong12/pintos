@@ -68,7 +68,6 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      // list_push_back (&sema->waiters, &thread_current ()->elem);
       list_insert_ordered (&sema->waiters, &thread_current ()->elem, priority_higher, NULL);
       thread_block ();
     }
@@ -253,7 +252,19 @@ struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
+    int priority; 
   };
+
+/* Returns true if the thread of sema_elem A has higher priority than that of B, false
+   otherwise. */
+static bool cond_priority_higher (const struct list_elem *a_, const struct list_elem *b_,
+                      void *aux UNUSED) 
+{
+  const struct semaphore_elem *a = list_entry (a_, struct semaphore_elem, elem);
+  const struct semaphore_elem *b = list_entry (b_, struct semaphore_elem, elem);
+  
+  return a->priority > b->priority ;
+}
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
@@ -272,7 +283,7 @@ cond_init (struct condition *cond)
    this function.
 
    The monitor implemented by this function is "Mesa" style, not
-   "Hoare" style, that is, sending and receiving a signal are not
+   "Hoare" style, that is, sending and receiving a sifxgnal are not
    an atomic operation.  Thus, typically the caller must recheck
    the condition after the wait completes and, if necessary, wait
    again.
@@ -297,8 +308,8 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  // list_push_back (&cond->waiters, &waiter.elem);
-  list_insert_ordered (&cond->waiters, &waiter.elem, priority_higher, NULL);
+  waiter.priority = thread_current()->priority;
+  list_insert_ordered (&cond->waiters, &waiter.elem, cond_priority_higher, NULL);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);

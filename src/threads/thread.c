@@ -201,12 +201,12 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-  // intr_set_level (old_level);
+  intr_set_level (old_level);
 
   /* Add to run queue. */
   thread_unblock (t);
 
-  // old_level = intr_disable ();
+  old_level = intr_disable ();
   priority_yield();
   intr_set_level (old_level);
 
@@ -310,7 +310,7 @@ thread_exit (void)
 /* Returns true if thread A has higher priority than B, false
    otherwise. */
 bool priority_higher (const struct list_elem *a_, const struct list_elem *b_,
-            void *aux UNUSED) 
+                      void *aux) 
 {
   const struct thread *a = list_entry (a_, struct thread, elem);
   const struct thread *b = list_entry (b_, struct thread, elem);
