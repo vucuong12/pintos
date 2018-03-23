@@ -186,8 +186,12 @@ lock_init (struct lock *lock)
 static void
 update_ready_list_when_thread_priority_changes(struct thread *t)
 {
+  enum intr_level old_level;
+  old_level = intr_disable ();
   list_remove(&t->elem);
   list_insert_ordered (&ready_list, &t->elem, priority_higher, NULL);
+  priority_yield();
+  intr_set_level (old_level);
 }
 
 // a donate its priority to b if b != null and priority(b) < priority(a)
@@ -309,9 +313,10 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   list_remove(&lock->elem);
-  update_thread_priority();
+  
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+  update_thread_priority();
 }
 
 /* Returns true if the current thread holds LOCK, false
