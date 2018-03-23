@@ -65,11 +65,11 @@ sema_down (struct semaphore *sema)
 
   ASSERT (sema != NULL);
   ASSERT (!intr_context ());
-
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
       list_insert_ordered (&sema->waiters, &thread_current ()->elem, priority_higher, NULL);
+      thread_current ()->wait_semaphore = sema;
       thread_block ();
     }
   sema->value--;
@@ -194,15 +194,34 @@ update_ready_list_when_thread_priority_changes(struct thread *t)
   intr_set_level (old_level);
 }
 
-// a donate its priority to b if b != null and priority(b) < priority(a)
-static void 
-donate(struct thread *a, struct thread *b)
+static void
+update_wait_list_when_thread_priority_changes(struct thread *t, struct list *wait_list)
 {
-  if (b != NULL && b->priority < a->priority){
-    if (b->original_priority == -1)
-      b->original_priority = b->priority;
-    b->priority = a->priority;
-    update_ready_list_when_thread_priority_changes(b);
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  list_remove(&t->elem);
+  list_insert_ordered (wait_list, &t->elem, priority_higher, NULL);
+  intr_set_level (old_level);
+}
+
+static void 
+donate_nested(struct thread *a, struct lock *l, int num_donated_threads)
+{
+  if (num_donated_threads == 8) {
+    return;
+  }
+  struct thread *lock_holder = l->holder;
+  if (lock_holder != NULL && lock_holder->priority < a->priority){
+    if (lock_holder->original_priority == -1)
+      lock_holder->original_priority = lock_holder->priority;
+    lock_holder->priority = a->priority;
+    if (lock_holder->status == THREAD_RUNNING) {
+      update_ready_list_when_thread_priority_changes(lock_holder);
+    } else {
+      //update_wait_list_when_thread_priority_changes(lock_holder, &((lock_holder->wait_lock)->semaphore.waiters));
+      //update_wait_list_when_thread_priority_changes(lock_holder, &(lock_holder->wait_semaphore->waiters));
+      donate_nested(lock_holder, lock_holder->wait_lock, num_donated_threads + 1);
+    }
   }
 }
 
@@ -243,7 +262,8 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
-  donate(thread_current(), lock->holder);
+  donate_nested(thread_current(), lock, 0);
+  thread_current()->wait_lock = lock;
   sema_down (&lock->semaphore);
   lock->holder = thread_current();
   list_push_back(&thread_current()->locks, &lock->elem);
