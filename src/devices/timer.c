@@ -97,7 +97,7 @@ waken_time_less (const struct list_elem *a_, const struct list_elem *b_,
 {
   const struct thread *a = list_entry (a_, struct thread, elem);
   const struct thread *b = list_entry (b_, struct thread, elem);
-  return a->waketime < b->waketime || (a->waketime == b->waketime && a->priority > a->priority);
+  return a->waketime < b->waketime || (a->waketime == b->waketime && a->priority > b->priority);
 }
 
 /* Sleeps for approximately TICKS timer ticks. */
