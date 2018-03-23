@@ -186,8 +186,12 @@ lock_init (struct lock *lock)
 static void
 update_ready_list_when_thread_priority_changes(struct thread *t)
 {
+  enum intr_level old_level;
+  old_level = intr_disable ();
   list_remove(&t->elem);
   list_insert_ordered (&ready_list, &t->elem, priority_higher, NULL);
+  priority_yield();
+  intr_set_level (old_level);
 }
 
 // a donate its priority to b if b != null and priority(b) < priority(a)
@@ -211,17 +215,6 @@ max_waiter_priority(struct lock *l)
   return -1;
 }
 
-/* Returns true if lock A has higher priority than B, false
-   otherwise. */
-static bool
-lock_priority_higher (const struct list_elem *a_, const struct list_elem *b_,
-                          void *aux UNUSED) 
-{
-  const struct lock *a = list_entry (a_, struct lock, elem);
-  const struct lock *b = list_entry (b_, struct lock, elem);
-  
-  return max_waiter_priority(a) > max_waiter_priority(b);
-}
 
 /* Returns true if lock A has lower priority than B, false
    otherwise. */
@@ -233,13 +226,6 @@ lock_priority_lower (const struct list_elem *a_, const struct list_elem *b_,
   const struct lock *b = list_entry (b_, struct lock, elem);
   
   return max_waiter_priority(a) < max_waiter_priority(b);
-}
-
-static void 
-add_lock_to_thread(struct thread *t, struct lock *l) 
-{
-  //list_insert_ordered(&t->locks, &t->elem, lock_priority_higher, NULL);
-  list_push_back(&t->locks, &l->elem);
 }
 
 /* Acquires LOCK, sleeping until it becomes available if
@@ -259,8 +245,8 @@ lock_acquire (struct lock *lock)
 
   donate(thread_current(), lock->holder);
   sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
-  add_lock_to_thread(lock->holder, lock);
+  lock->holder = thread_current();
+  list_push_back(&thread_current()->locks, &lock->elem);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -278,57 +264,35 @@ lock_try_acquire (struct lock *lock)
   ASSERT (!lock_held_by_current_thread (lock));
 
   success = sema_try_down (&lock->semaphore);
-  if (success)
+  if (success){
     lock->holder = thread_current ();
+    list_push_back(&thread_current()->locks, &lock->elem);
+  }
   return success;
 }
 
 static void
-update_thread_priority(void)
+update_thread_priority()
 {
-  struct thread *t = thread_current();
-  int new_priority;
-  if (list_empty(&t->locks)){
-    if (t->original_priority == -1) {
-      //t has not been donated, keep the same priority.
-      new_priority = t->priority;
-    } else {
-      //t has ben donated, so its current priority is not its original priority.
+  struct thread * t = thread_current();
+  if (t->original_priority != -1){
+    int new_priority;
+    if (list_empty(&t->locks)){
       new_priority = t->original_priority;
       t->original_priority = -1;
     }
-    
-  }
-  else {
-    int x = list_size(&t->locks);
-    struct list_elem *max_lock_elem = list_max(&t->locks, lock_priority_lower, NULL);
-    struct lock *max_lock = list_entry(max_lock_elem, struct lock, elem);
-    int max_priority_for_a_lock = max_waiter_priority(max_lock);
-    if (max_priority_for_a_lock > t->original_priority){
-      new_priority = max_priority_for_a_lock;
-    } else {
-      new_priority = t->original_priority;
-      t->original_priority = -1;
+    else {
+      struct list_elem *max_lock_elem = list_max(&t->locks, lock_priority_lower, NULL);
+      int max_priority_for_a_lock = max_waiter_priority(list_entry (max_lock_elem, struct lock, elem));
+      if (max_priority_for_a_lock > t->original_priority){
+        new_priority = max_priority_for_a_lock;
+      } else {
+        new_priority = t->original_priority;
+        t->original_priority = -1;
+      }
     }
+    thread_current()->priority = new_priority;
   }
-  thread_set_priority(new_priority);
-}
-
-static void
-update_thread_priority_after_lock_release(struct lock *l)
-{
-  struct thread *a = thread_current();
-  struct list locks = a->locks;
-  struct list_elem *e;
-  for (e = list_begin (&locks); e != list_end (&locks); e = list_next (e))
-  {
-    struct lock *alock = list_entry (e, struct lock, elem);
-    if (l == alock) {
-      list_remove(e);
-      break;
-    }
-  }
-  update_thread_priority();
 }
 
 /* Releases LOCK, which must be owned by the current thread.
@@ -342,9 +306,11 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  list_remove(&lock->elem);
+  
   lock->holder = NULL;
-  sema_up (&lock->semaphore);
-  update_thread_priority_after_lock_release(lock);
+  update_thread_priority();
+  sema_up (&lock->semaphore); 
 }
 
 /* Returns true if the current thread holds LOCK, false

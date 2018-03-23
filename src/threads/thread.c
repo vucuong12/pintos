@@ -313,8 +313,9 @@ bool priority_higher (const struct list_elem *a_, const struct list_elem *b_,
 {
   const struct thread *a = list_entry (a_, struct thread, elem);
   const struct thread *b = list_entry (b_, struct thread, elem);
-  
-  return a->priority > b->priority ;
+  ASSERT(is_thread(a));
+  ASSERT(is_thread(b));
+  return a->priority > b->priority;
 }
 
 /* Yields the CPU.  The current thread is not put to sleep and
