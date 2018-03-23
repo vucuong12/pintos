@@ -330,8 +330,6 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    // put thread in ready_list in priority order
-    // list_push_back (&ready_list, &cur->elem);
     list_insert_ordered (&ready_list, &cur->elem, priority_higher, NULL);
   cur->status = THREAD_READY;
   schedule ();
@@ -374,14 +372,17 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  if (thread_current ()->original_priority == -1 || thread_get_priority() < new_priority) {
-    enum intr_level old_level;
+  enum intr_level old_level;
 
-    old_level = intr_disable ();
+  old_level = intr_disable ();
+  if (thread_current ()->original_priority == -1 || thread_get_priority() < new_priority) {    
     thread_current ()->priority = new_priority;
-    priority_yield();
-    intr_set_level (old_level);
+    priority_yield();  
   }
+  else{
+    thread_current ()->original_priority = new_priority;
+  }
+  intr_set_level (old_level);
 }
 
 /* Returns the current thread's priority. */

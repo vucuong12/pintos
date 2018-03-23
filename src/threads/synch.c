@@ -221,7 +221,6 @@ donate_nested(struct thread *a, struct lock *l, int num_donated_threads)
     if (lock_holder->status == THREAD_RUNNING) {
       update_ready_list_when_thread_priority_changes(lock_holder);
     } else {
-      //update_wait_list_when_thread_priority_changes(lock_holder, &((lock_holder->wait_lock)->semaphore.waiters));
       if (lock_holder->wait_semaphore != NULL){
         update_wait_list_when_thread_priority_changes(lock_holder, &(lock_holder->wait_semaphore->waiters));
       }
