@@ -374,12 +374,14 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  enum intr_level old_level;
+  if (thread_current ()->original_priority == -1 || thread_get_priority() < new_priority) {
+    enum intr_level old_level;
 
-  old_level = intr_disable ();
-  thread_current ()->priority = new_priority;
-  priority_yield();
-  intr_set_level (old_level);
+    old_level = intr_disable ();
+    thread_current ()->priority = new_priority;
+    priority_yield();
+    intr_set_level (old_level);
+  }
 }
 
 /* Returns the current thread's priority. */
