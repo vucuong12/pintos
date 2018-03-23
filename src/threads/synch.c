@@ -114,9 +114,12 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  if (!list_empty (&sema->waiters))  {
+    struct thread *t = list_entry (list_pop_front (&sema->waiters),
+                                struct thread, elem);
+    t->wait_semaphore = NULL;
+    thread_unblock (t);
+  }
   sema->value++;
   priority_yield();
   intr_set_level (old_level);
@@ -219,7 +222,9 @@ donate_nested(struct thread *a, struct lock *l, int num_donated_threads)
       update_ready_list_when_thread_priority_changes(lock_holder);
     } else {
       //update_wait_list_when_thread_priority_changes(lock_holder, &((lock_holder->wait_lock)->semaphore.waiters));
-      //update_wait_list_when_thread_priority_changes(lock_holder, &(lock_holder->wait_semaphore->waiters));
+      if (lock_holder->wait_semaphore != NULL){
+        update_wait_list_when_thread_priority_changes(lock_holder, &(lock_holder->wait_semaphore->waiters));
+      }
       donate_nested(lock_holder, lock_holder->wait_lock, num_donated_threads + 1);
     }
   }

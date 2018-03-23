@@ -507,6 +507,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   t->original_priority = -1; // not donated
   list_init(&t->locks);
+  t->wait_semaphore = NULL;
+  t->wait_lock = NULL;
   list_push_back (&all_list, &t->allelem);
 }
 
