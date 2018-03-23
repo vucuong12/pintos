@@ -69,7 +69,6 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-
       list_insert_ordered (&sema->waiters, &thread_current ()->elem, priority_higher, NULL);
       thread_block ();
     }
@@ -218,10 +217,10 @@ static bool
 lock_priority_higher (const struct list_elem *a_, const struct list_elem *b_,
                           void *aux UNUSED) 
 {
-  const struct lock_address_elem *a = list_entry (a_, struct lock_address_elem, elem);
-  const struct lock_address_elem *b = list_entry (b_, struct lock_address_elem, elem);
+  const struct lock *a = list_entry (a_, struct lock, elem);
+  const struct lock *b = list_entry (b_, struct lock, elem);
   
-  return max_waiter_priority(a->address) > max_waiter_priority(b->address);
+  return max_waiter_priority(a) > max_waiter_priority(b);
 }
 
 /* Returns true if lock A has lower priority than B, false
@@ -230,19 +229,17 @@ static bool
 lock_priority_lower (const struct list_elem *a_, const struct list_elem *b_,
                           void *aux UNUSED) 
 {
-  const struct lock_address_elem *a = list_entry (a_, struct lock_address_elem, elem);
-  const struct lock_address_elem *b = list_entry (b_, struct lock_address_elem, elem);
+  const struct lock *a = list_entry (a_, struct lock, elem);
+  const struct lock *b = list_entry (b_, struct lock, elem);
   
-  return max_waiter_priority(a->address) < max_waiter_priority(b->address);
+  return max_waiter_priority(a) < max_waiter_priority(b);
 }
 
 static void 
 add_lock_to_thread(struct thread *t, struct lock *l) 
 {
-  struct lock_address_elem *lock_elem = malloc (sizeof *lock_elem);
-  lock_elem->address = l;
   //list_insert_ordered(&t->locks, &t->elem, lock_priority_higher, NULL);
-  list_push_back(&t->locks, &lock_elem->elem);
+  list_push_back(&t->locks, &l->elem);
 }
 
 /* Acquires LOCK, sleeping until it becomes available if
@@ -290,16 +287,23 @@ static void
 update_thread_priority(void)
 {
   struct thread *t = thread_current();
-  ASSERT (t->original_priority != -1);
   int new_priority;
   if (list_empty(&t->locks)){
-    new_priority = t->original_priority;
-    t->original_priority = -1;
+    if (t->original_priority == -1) {
+      //t has not been donated, keep the same priority.
+      new_priority = t->priority;
+    } else {
+      //t has ben donated, so its current priority is not its original priority.
+      new_priority = t->original_priority;
+      t->original_priority = -1;
+    }
     
   }
   else {
-    struct lock_address_elem *max_lock = list_entry(list_max(&t->locks, lock_priority_lower, NULL), struct lock_address_elem, elem);
-    int max_priority_for_a_lock = max_waiter_priority(max_lock->address);
+    int x = list_size(&t->locks);
+    struct list_elem *max_lock_elem = list_max(&t->locks, lock_priority_lower, NULL);
+    struct lock *max_lock = list_entry(max_lock_elem, struct lock, elem);
+    int max_priority_for_a_lock = max_waiter_priority(max_lock);
     if (max_priority_for_a_lock > t->original_priority){
       new_priority = max_priority_for_a_lock;
     } else {
@@ -318,10 +322,9 @@ update_thread_priority_after_lock_release(struct lock *l)
   struct list_elem *e;
   for (e = list_begin (&locks); e != list_end (&locks); e = list_next (e))
   {
-    struct lock_address_elem *lae = list_entry (e, struct lock_address_elem, elem);
-    if (l == lae->address) {
+    struct lock *alock = list_entry (e, struct lock, elem);
+    if (l == alock) {
       list_remove(e);
-      free(lae);
       break;
     }
   }
