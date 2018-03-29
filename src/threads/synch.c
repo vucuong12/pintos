@@ -273,7 +273,6 @@ lock_acquire (struct lock *lock)
   donate_nested(thread_current(), lock, 0);
   thread_current()->wait_lock = lock;
   sema_down (&lock->semaphore);
-  //thread_current()->wait_lock = NULL;
   lock->holder = thread_current();
   list_push_back(&thread_current()->locks, &lock->elem);
 }
