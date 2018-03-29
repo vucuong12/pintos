@@ -119,6 +119,7 @@ sema_up (struct semaphore *sema)
     struct thread *t = 
       list_entry (list_pop_front (&sema->waiters), struct thread, elem);
     t->wait_semaphore = NULL;
+    t->wait_lock = NULL;
     thread_unblock (t);
   }
   sema->value++;
@@ -220,15 +221,15 @@ donate_nested(struct thread *a, struct lock *l, int num_donated_threads)
     if (lock_holder->original_priority == -1)
       lock_holder->original_priority = lock_holder->priority;
     lock_holder->priority = a->priority;
-    if (lock_holder->status == THREAD_RUNNING) {
+    if (lock_holder->status == THREAD_READY) {
       update_ready_list_when_thread_priority_changes(lock_holder);
     } else {
       if (lock_holder->wait_semaphore != NULL){
         update_wait_list_when_thread_priority_changes(
           lock_holder, &(lock_holder->wait_semaphore->waiters));
       }
-      donate_nested(lock_holder, lock_holder->wait_lock, num_donated_threads + 1);
     }
+    donate_nested(lock_holder, lock_holder->wait_lock, num_donated_threads + 1);
   }
 }
 
@@ -272,6 +273,7 @@ lock_acquire (struct lock *lock)
   donate_nested(thread_current(), lock, 0);
   thread_current()->wait_lock = lock;
   sema_down (&lock->semaphore);
+  //thread_current()->wait_lock = NULL;
   lock->holder = thread_current();
   list_push_back(&thread_current()->locks, &lock->elem);
 }
@@ -338,8 +340,11 @@ lock_release (struct lock *lock)
   list_remove(&lock->elem);
   
   lock->holder = NULL;
+  enum intr_level old_level;
+  old_level = intr_disable ();
   update_thread_priority();
   sema_up (&lock->semaphore); 
+  intr_set_level (old_level);
 }
 
 /* Returns true if the current thread holds LOCK, false

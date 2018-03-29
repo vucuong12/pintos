@@ -106,9 +106,10 @@ void
 timer_sleep (int64_t ticks)
 {
   enum intr_level old_level;
+  
   int64_t start = timer_ticks ();
-  old_level = intr_disable ();
   thread_current ()->waketime = start + ticks;
+  old_level = intr_disable ();
   list_insert_ordered (
       &sleep_list, &thread_current ()->elem, waken_time_less, NULL);
   thread_block ();
@@ -199,9 +200,11 @@ timer_interrupt (struct intr_frame *args UNUSED)
     if (ticks < sleep_thread->waketime)
       break;
     list_remove(e);
-    thread_unblock(sleep_thread);  
+    thread_unblock(sleep_thread);
+    if (sleep_thread->priority > thread_get_priority()) {
+      intr_yield_on_return();
+    }
   }
-
   thread_tick ();
   intr_set_level (old_level);
 }

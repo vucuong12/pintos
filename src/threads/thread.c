@@ -387,11 +387,14 @@ thread_set_priority (int new_priority)
 
   old_level = intr_disable ();
   if (thread_current ()->original_priority == -1 
-      || thread_get_priority() < new_priority) {    
+      || thread_get_priority() < new_priority) {
+    bool is_lowering_priority = thread_get_priority() > new_priority;
     thread_current ()->priority = new_priority;
-    priority_yield();  
+    if (is_lowering_priority) {
+      priority_yield();
+    }
   }
-  else{
+  else {
     thread_current ()->original_priority = new_priority;
   }
   intr_set_level (old_level);
