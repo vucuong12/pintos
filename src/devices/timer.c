@@ -92,11 +92,13 @@ timer_elapsed (int64_t then)
 /* Returns true if thread A is waken before B, false
    otherwise. */
 static bool
-waken_time_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED) 
+waken_time_less (
+    const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED) 
 {
   const struct thread *a = list_entry (a_, struct thread, elem);
   const struct thread *b = list_entry (b_, struct thread, elem);
-  return a->waketime < b->waketime || (a->waketime == b->waketime && a->priority > b->priority);
+  return a->waketime < b->waketime
+      || (a->waketime == b->waketime && a->priority > b->priority);
 }
 
 /* Sleeps for approximately TICKS timer ticks. */
@@ -107,7 +109,8 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
   old_level = intr_disable ();
   thread_current ()->waketime = start + ticks;
-  list_insert_ordered (&sleep_list, &thread_current ()->elem, waken_time_less, NULL);
+  list_insert_ordered (
+      &sleep_list, &thread_current ()->elem, waken_time_less, NULL);
   thread_block ();
   intr_set_level (old_level);
 }
