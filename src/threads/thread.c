@@ -20,6 +20,10 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
+/* List of processes in THREAD_READY state, that is, processes 
+   that are ready to run but not actually running. */  
+static struct list ready_list; 
+
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -228,6 +232,11 @@ thread_block (void)
   schedule ();
 }
 
+void
+thread_ready_list_insert_ordered (struct thread *t) {
+  list_insert_ordered (&ready_list, &t->elem, priority_higher, NULL);
+}
+
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
@@ -246,7 +255,7 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
 
-  list_insert_ordered (&ready_list, &t->elem, priority_higher, NULL);
+  thread_ready_list_insert_ordered (t);
 
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -330,24 +339,26 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_insert_ordered (&ready_list, &cur->elem, priority_higher, NULL);
+    thread_ready_list_insert_ordered (cur);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
 }
 
-/* Yield the current thread if its priority is lower than the first in the ready list */
+/* Yield the current thread if its priority is lower than the first in the 
+  ready list */
 void
 priority_yield (void) 
 {
   if (list_empty (&ready_list))
     return;
-  struct thread *t =  list_entry (list_front (&ready_list), struct thread, elem);
+  struct thread *t = list_entry (list_front (&ready_list), struct thread, elem);
   if ((t->priority) > (thread_current()->priority))
     thread_yield();
 }
 
-bool is_idle_thread(struct thread *t) {
+bool
+is_idle_thread(struct thread *t) {
   return (t == idle_thread) ;
 }
 
@@ -375,7 +386,8 @@ thread_set_priority (int new_priority)
   enum intr_level old_level;
 
   old_level = intr_disable ();
-  if (thread_current ()->original_priority == -1 || thread_get_priority() < new_priority) {    
+  if (thread_current ()->original_priority == -1 
+      || thread_get_priority() < new_priority) {    
     thread_current ()->priority = new_priority;
     priority_yield();  
   }

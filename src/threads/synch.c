@@ -31,7 +31,6 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "threads/malloc.h"
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -65,10 +64,12 @@ sema_down (struct semaphore *sema)
 
   ASSERT (sema != NULL);
   ASSERT (!intr_context ());
+
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_insert_ordered (&sema->waiters, &thread_current ()->elem, priority_higher, NULL);
+      list_insert_ordered (
+        &sema->waiters, &thread_current ()->elem, priority_higher, NULL);
       thread_current ()->wait_semaphore = sema;
       thread_block ();
     }
@@ -115,8 +116,8 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters))  {
-    struct thread *t = list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem);
+    struct thread *t = 
+      list_entry (list_pop_front (&sema->waiters), struct thread, elem);
     t->wait_semaphore = NULL;
     thread_unblock (t);
   }
@@ -192,13 +193,14 @@ update_ready_list_when_thread_priority_changes(struct thread *t)
   enum intr_level old_level;
   old_level = intr_disable ();
   list_remove(&t->elem);
-  list_insert_ordered (&ready_list, &t->elem, priority_higher, NULL);
+  thread_ready_list_insert_ordered(t);
   priority_yield();
   intr_set_level (old_level);
 }
 
 static void
-update_wait_list_when_thread_priority_changes(struct thread *t, struct list *wait_list)
+update_wait_list_when_thread_priority_changes(
+  struct thread *t, struct list *wait_list)
 {
   enum intr_level old_level;
   old_level = intr_disable ();
@@ -222,7 +224,8 @@ donate_nested(struct thread *a, struct lock *l, int num_donated_threads)
       update_ready_list_when_thread_priority_changes(lock_holder);
     } else {
       if (lock_holder->wait_semaphore != NULL){
-        update_wait_list_when_thread_priority_changes(lock_holder, &(lock_holder->wait_semaphore->waiters));
+        update_wait_list_when_thread_priority_changes(
+          lock_holder, &(lock_holder->wait_semaphore->waiters));
       }
       donate_nested(lock_holder, lock_holder->wait_lock, num_donated_threads + 1);
     }
@@ -306,8 +309,10 @@ update_thread_priority()
       t->original_priority = -1;
     }
     else {
-      struct list_elem *max_lock_elem = list_max(&t->locks, lock_priority_lower, NULL);
-      int max_priority_for_a_lock = max_waiter_priority(list_entry (max_lock_elem, struct lock, elem));
+      struct list_elem *max_lock_elem =
+          list_max(&t->locks, lock_priority_lower, NULL);
+      int max_priority_for_a_lock = max_waiter_priority(
+          list_entry (max_lock_elem, struct lock, elem));
       if (max_priority_for_a_lock > t->original_priority){
         new_priority = max_priority_for_a_lock;
       } else {
@@ -384,7 +389,7 @@ cond_init (struct condition *cond)
    this function.
 
    The monitor implemented by this function is "Mesa" style, not
-   "Hoare" style, that is, sending and receiving a sifxgnal are not
+   "Hoare" style, that is, sending and receiving a signal are not
    an atomic operation.  Thus, typically the caller must recheck
    the condition after the wait completes and, if necessary, wait
    again.

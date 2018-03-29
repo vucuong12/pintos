@@ -114,10 +114,6 @@ struct thread
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
-/* List of processes in THREAD_READY state, that is, processes
-   that are ready to run but not actually running. */
-struct list ready_list;
-
 void thread_init (void);
 void thread_start (void);
 
@@ -126,6 +122,8 @@ void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
+
+void thread_ready_list_insert_ordered (struct thread *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);

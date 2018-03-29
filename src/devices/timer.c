@@ -18,7 +18,7 @@
 #endif
 
 /* List of processes in THREAD_BLOCKED state, that is, processes
-   that are waiting for some event such as timer, networking, etc. */
+   that are sleeping caused by timer_sleep function. */
 static struct list sleep_list;
 
 /* Number of timer ticks since OS booted. */
@@ -92,8 +92,7 @@ timer_elapsed (int64_t then)
 /* Returns true if thread A is waken before B, false
    otherwise. */
 static bool
-waken_time_less (const struct list_elem *a_, const struct list_elem *b_,
-            void *aux UNUSED) 
+waken_time_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED) 
 {
   const struct thread *a = list_entry (a_, struct thread, elem);
   const struct thread *b = list_entry (b_, struct thread, elem);
@@ -108,7 +107,6 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
   old_level = intr_disable ();
   thread_current ()->waketime = start + ticks;
-  // printf("Wake time %d\n", thread_current ()->waketime);
   list_insert_ordered (&sleep_list, &thread_current ()->elem, waken_time_less, NULL);
   thread_block ();
   intr_set_level (old_level);
@@ -197,8 +195,6 @@ timer_interrupt (struct intr_frame *args UNUSED)
     struct thread *sleep_thread = list_entry (e, struct thread, elem);
     if (ticks < sleep_thread->waketime)
       break;
-    // printf("Sleep thread %s\n", sleep_thread->name);
-    // printf("Waketime %d. Ticks: %d \n", sleep_thread->waketime, ticks);
     list_remove(e);
     thread_unblock(sleep_thread);  
   }

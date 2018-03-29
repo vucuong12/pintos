@@ -33,9 +33,8 @@ test_alarm_priority (void)
 
   thread_set_priority (PRI_MIN);
 
-  for (i = 0; i < 10; i++){
+  for (i = 0; i < 10; i++)
     sema_down (&wait_sema);
-  }
 }
 
 static void
@@ -45,8 +44,6 @@ alarm_priority_thread (void *aux UNUSED)
   int64_t start_time = timer_ticks ();
   while (timer_elapsed (start_time) == 0)
     continue;
-
-  //msg ("Put thread to sleep with priority %d\n", thread_current()->priority);
 
   /* Now we know we're at the very beginning of a timer tick, so
      we can call timer_sleep() without worrying about races
